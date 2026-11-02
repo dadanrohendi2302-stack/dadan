@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catatan Keuangan</title>
+    <!-- Pustaka Chart.js untuk Grafik -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #141416;
+            --card-bg: rgba(30, 30, 35, 0.85);
+            --text-color: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent-color: #ff5722;
+            --border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #08080a;
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .phone-container {
+            width: 100%;
+            max-width: 420px;
+            height: 100vh;
+            max-height: 100vh;
+            background: linear-gradient(145deg, #161619, #0f0f12);
+            border: none;
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            box-shadow: none;
+        }
+
+        @media (min-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            .phone-container {
+                height: 760px;
+                max-height: 90vh;
+                border: 4px solid #2a2a30;
+                border-radius: 36px;
+                box-shadow: 0 15px 35px rgba(0,0,0,0.9);
+            }
+        }
+
+        .app-header {
+            padding: 24px 20px 12px 20px;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Tombol Backup/Restore di Header */
+        .backup-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .btn-icon-top {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s ease;
+        }
+        .btn-icon-top:active {
+            background: rgba(255, 87, 34, 0.3);
+        }
+
+        /* Navigasi Super Halus & Mulus Ala iPhone */
+        .app-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 5px 20px 95px 20px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: calc(100% - 70px);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(25px) scale(0.98);
+            transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+        }
+
+        .app-content.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+            position: relative;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #ff7043, #ff5722);
+            color: white;
+            border: none;
+            padding: 13px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 10px 0 15px 0;
+            width: 100%;
+            box-shadow: 0 6px 16px rgba(255, 87, 34, 0.4);
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+
+        .btn-primary:active {
+            transform: scale(0.97);
+            opacity: 0.9;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 5px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .card.full {
+            grid-column: span 2;
+            margin-bottom: 0;
+        }
+
+        .card-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .card-value {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .card-value.income { color: #4ade80; }
+        .card-value.expense { color: #f87171; }
+        .card-value.balance { color: #60a5fa; }
+
+        .section-title {
+            font-size: 15px;
+            font-weight: bold;
+            margin: 15px 0 10px 0;
+        }
+
+        .search-box {
+            width: 100%;
+            background-color: rgba(30, 30, 35, 0.9);
+            border: 1px solid var(--border-color);
+            padding: 11px 15px;
+            border-radius: 12px;
+            color: white;
+            font-size: 13px;
+            margin-bottom: 12px;
+            outline: none;
+        }
+
+        .transaction-list, .debt-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* Container Item Swipe */
+        .swipe-wrapper {
+            position: relative;
+            overflow: hidden;
+            border-radius: 12px;
+            background-color: #1a1a20;
+        }
+
+        .swipe-actions {
+            position: absolute;
+            top: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding-right: 10px;
+            z-index: 1;
+        }
+
+        .action-btn {
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            color: white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .btn-edit-action { background-color: #3b82f6; } 
+        .btn-del-action { background-color: #ef4444; } 
+
+        .transaction-item, .debt-item {
+            background-color: var(--card-bg);
+            backdrop-filter: blur(10px);
+            padding: 12px 15px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            touch-action: pan-y;
+        }
+
+        .trans-info h4, .debt-info h4 { font-size: 13px; margin-bottom: 3px; }
+        .trans-info p, .debt-info p { font-size: 10px; color: var(--text-muted); }
+        
+        .right-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .trans-amount, .debt-amount { font-weight: bold; font-size: 13px; }
+
+        /* Modal / Dialog Kustom */
+        .modal {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(6px);
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .modal.active {
+            display: flex;
+            opacity: 1;
+        }
+        .modal-content {
+            background: #1c1c22;
+            padding: 20px;
+            border-radius: 18px;
+            width: 100%;
+            border: 1px solid var(--border-color);
+            transform: scale(0.92);
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal.active .modal-content {
+            transform: scale(1);
+        }
+        .modal-content h3 { margin-bottom: 15px; font-size: 16px; }
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 10px; border-radius: 10px; background: #121215; border: 1px solid var(--border-color); color: white; font-size: 13px; outline: none;
+        }
+        .modal-actions { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-cancel { background: #2d2d35; color: white; border: none; padding: 10px; border-radius: 10px; flex: 1; cursor: pointer; }
+        .btn-save { background: var(--accent-color); color: white; border: none; padding: 10px; border-radius: 10px; flex: 1; cursor: pointer; font-weight: bold; }
+        .btn-danger { background: #ef4444; color: white; border: none; padding: 10px; border-radius: 10px; flex: 1; cursor: pointer; font-weight: bold; }
+        .btn-delete { background: none; border: none; color: var(--text-muted); font-size: 14px; cursor: pointer; }
+
+        /* Bottom Nav Kapsul Mengapung Modern */
+        .bottom-nav-container {
+            position: absolute;
+            bottom: 15px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .bottom-nav {
+            pointer-events: auto;
+            background: rgba(28, 28, 34, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 36px;
+            display: flex;
+            padding: 6px;
+            gap: 6px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 8px 16px;
+            border-radius: 28px;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            background: transparent;
+        }
+
+        .nav-icon {
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .nav-text {
+            font-size: 10px;
+            line-height: 1;
+        }
+
+        .nav-item.active {
+            background: rgba(255, 87, 34, 0.18);
+            color: var(--accent-color);
+        }
+
+        .nav-item:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="phone-container">
+        <!-- TAB 1: TRANSAKSI -->
+        <div id="tab-transaksi" class="app-content active">
+            <div class="app-header">
+                <span>Catatan Transaksi</span>
+                <div class="backup-actions">
+                    <button class="btn-icon-top" onclick="exportData()" title="Cadangkan Data (Backup)">📥</button>
+                    <button class="btn-icon-top" onclick="triggerImport()" title="Pulihkan Data (Restore)">📤</button>
+                    <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(event)">
+                </div>
+            </div>
+
+            <div class="card-grid">
+                <div class="card" style="margin-bottom:0;">
+                    <div class="card-title">Total Pemasukan</div>
+                    <div class="card-value income" id="totalIncome">Rp 0</div>
+                </div>
+                <div class="card" style="margin-bottom:0;">
+                    <div class="card-title">Total Pengeluaran</div>
+                    <div class="card-value expense" id="totalExpense">Rp 0</div>
+                </div>
+                <div class="card full">
+                    <div class="card-title">Saldo Kas Saat Ini</div>
+                    <div class="card-value balance" id="totalBalance">Rp 0</div>
+                </div>
+            </div>
+
+            <!-- Tombol Tambah Transaksi -->
+            <button class="btn-primary" onclick="openModal('trans')">+ Tambah Transaksi</button>
+
+            <div class="section-title">Daftar Transaksi</div>
+            <input type="text" id="searchBox" class="search-box" placeholder="Cari keterangan atau kategori..." oninput="renderTransactions()">
+
+            <div class="transaction-list" id="transactionList"></div>
+        </div>
+
+        <!-- TAB 2: RINGKASAN -->
+        <div id="tab-ringkasan" class="app-content">
+            <div class="app-header">Ringkasan Arus Kas</div>
+            
+            <div class="card">
+                <div class="card-title">Analisa Keuangan</div>
+                <p id="summaryText" style="font-size: 12px; color: var(--text-muted); margin-top: 5px; line-height: 1.4;">Belum ada data transaksi tercatat.</p>
+            </div>
+
+            <div class="card">
+                <div class="card-title" style="margin-bottom: 10px;">Pengeluaran per Kategori</div>
+                <div style="position: relative; height: 160px; width: 100%; display: flex; justify-content: center;">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+                <div id="categoryLegend" style="margin-top: 12px; font-size: 12px; display: flex; flex-direction: column; gap: 6px;"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title" style="margin-bottom: 10px;">Tren Saldo Berjalan</div>
+                <div style="position: relative; height: 140px; width: 100%;">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: UTANG -->
+        <div id="tab-utang" class="app-content">
+            <div class="app-header">Utang dan Piutang</div>
+            
+            <div class="card-grid" style="margin-bottom: 15px;">
+                <div class="card" style="margin-bottom:0;">
+                    <div class="card-title">Total Utang Saya</div>
+                    <div class="card-value expense" id="totalDebt">Rp 0</div>
+                </div>
+                <div class="card" style="margin-bottom:0;">
+                    <div class="card-title">Piutang (Orang Lain)</div>
+                    <div class="card-value income" id="totalReceivable">Rp 0</div>
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="openModal('debt')">+ Tambah Utang/Piutang</button>
+
+            <div class="section-title">Catatan Utang</div>
+            <div class="debt-list" id="debtList"></div>
+        </div>
+
+        <!-- MODAL TRANSAKSI -->
+        <div class="modal" id="modalTrans">
+            <div class="modal-content">
+                <h3 id="modalTitle">Tambah Transaksi</h3>
+                <input type="hidden" id="editIndex" value="-1">
+                <div class="form-group">
+                    <label>Pilih Cepat Keterangan</label>
+                    <select id="tDescSelect" onchange="onDescSelectChange()">
+                        <option value="">-- Atau ketik manual di bawah --</option>
+                        <option value="Gaji">Gaji</option>
+                        <option value="Uang Saku">Uang Saku</option>
+                        <option value="Jajan">Jajan</option>
+                        <option value="Makan">Makan</option>
+                        <option value="Bensin">Bensin</option>
+                        <option value="Oli">Oli</option>
+                        <option value="Trading">Trading</option>
+                        <option value="Keluarga">Keluarga</option>
+                        <option value="Bayar Hutang">Bayar Hutang</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Keterangan</label>
+                    <input type="text" id="tDesc" placeholder="Keterangan transaksi...">
+                </div>
+                <div class="form-group">
+                    <label>Kategori</label>
+                    <input type="text" id="tCat" placeholder="Contoh: Operasional, Pribadi">
+                </div>
+                <div class="form-group">
+                    <label>Jenis</label>
+                    <select id="tType">
+                        <option value="income">Pemasukan (+)</option>
+                        <option value="expense">Pengeluaran (-)</option>
+                        <option value="orang_ngutang">Orang Ngutang (Masuk)</option>
+                        <option value="saya_ngutang">Saya Ngutang (Keluar)</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Nominal (Rp)</label><input type="number" id="tAmount" placeholder="50000"></div>
+                <div class="modal-actions">
+                    <button class="btn-cancel" onclick="closeModal('trans')">Batal</button>
+                    <button class="btn-save" onclick="saveTransaction()">Simpan</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL KONFIRMASI HAPUS KUSTOM -->
+        <div class="modal" id="modalDeleteConfirm">
+            <div class="modal-content" style="text-align: center;">
+                <h3 style="margin-bottom: 10px;">Hapus Transaksi?</h3>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">Data transaksi ini akan dihapus secara permanen dari catatan.</p>
+                <input type="hidden" id="deleteIndex" value="-1">
+                <div class="modal-actions">
+                    <button class="btn-cancel" onclick="closeModal('delete')">Batal</button>
+                    <button class="btn-danger" onclick="confirmDelete()">Hapus</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL UTANG -->
+        <div class="modal" id="modalDebt">
+            <div class="modal-content">
+                <h3>Tambah Catatan Utang</h3>
+                <div class="form-group"><label>Nama Pihak</label><input type="text" id="dName" placeholder="Nama orang/toko"></div>
+                <div class="form-group"><label>Jenis</label><select id="dType"><option value="debt">Utang Saya</option><option value="receivable">Piutang (Orang Lain)</option></select></div>
+                <div class="form-group"><label>Nominal (Rp)</label><input type="number" id="dAmount" placeholder="100000"></div>
+                <div class="modal-actions">
+                    <button class="btn-cancel" onclick="closeModal('debt')">Batal</button>
+                    <button class="btn-save" onclick="saveDebt()">Simpan</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTTOM NAV KAPSUL MENGAPUNG MODERN -->
+        <div class="bottom-nav-container">
+            <div class="bottom-nav">
+                <div class="nav-item active" onclick="switchTab('transaksi', this)">
+                    <span class="nav-icon">📄</span>
+                    <span class="nav-text">Transaksi</span>
+                </div>
+                <div class="nav-item" onclick="switchTab('ringkasan', this)">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-text">Ringkasan</span>
+                </div>
+                <div class="nav-item" onclick="switchTab('utang', this)">
+                    <span class="nav-icon">🤝</span>
+                    <span class="nav-text">Utang</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+        let debts = JSON.parse(localStorage.getItem('debts')) || [];
+        let trendChartObj = null;
+        let categoryChartObj = null;
+
+        function formatRupiah(angka) {
+            return "Rp " + angka.toLocaleString('id-ID');
+        }
+
+        /* Fitur Cadangkan & Pulihkan Data (Backup & Restore) */
+        function exportData() {
+            const dataObj = { transactions, debts };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataObj, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `backup_keuangan_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function triggerImport() {
+            document.getElementById('importFile').click();
+        }
+
+        function importData(event) {
+            const fileReader = new FileReader();
+            if (event.target.files[0]) {
+                fileReader.readAsText(event.target.files[0], "UTF-8");
+                fileReader.onload = function (e) {
+                    try {
+                        const parsed = JSON.parse(e.target.result);
+                        if (parsed.transactions && parsed.debts) {
+                            transactions = parsed.transactions;
+                            debts = parsed.debts;
+                            localStorage.setItem('transactions', JSON.stringify(transactions));
+                            localStorage.setItem('debts', JSON.stringify(debts));
+                            renderTransactions();
+                            renderDebts();
+                            alert('Data berhasil dipulihkan!');
+                        } else {
+                            alert('Format file cadangan tidak valid!');
+                        }
+                    } catch (err) {
+                        alert('Gagal membaca file!');
+                    }
+                };
+            }
+        }
+
+        function onDescSelectChange() {
+            let val = document.getElementById('tDescSelect').value;
+            let descInput = document.getElementById('tDesc');
+            if(val) {
+                descInput.value = val;
+                let typeSelect = document.getElementById('tType');
+                if(['Gaji', 'Uang Saku'].includes(val)) {
+                    typeSelect.value = 'income';
+                } else if(val !== '') {
+                    typeSelect.value = 'expense';
+                }
+            }
+        }
+
+        function switchTab(tabName, el) {
+            document.querySelectorAll('.app-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            document.getElementById('tab-' + tabName).classList.add('active');
+            el.classList.add('active');
+
+            if(tabName === 'ringkasan') {
+                updateSummary();
+                renderCharts();
+            }
+        }
+
+        function renderTransactions() {
+            const listEl = document.getElementById('transactionList');
+            const keyword = document.getElementById('searchBox').value.toLowerCase();
+            listEl.innerHTML = '';
+
+            let totalInc = 0, totalExp = 0;
+            const filtered = transactions.filter(t => t.desc.toLowerCase().includes(keyword) || t.cat.toLowerCase().includes(keyword));
+
+            if(filtered.length === 0) {
+                listEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">Belum ada data transaksi.</div>`;
+            }
+
+            filtered.forEach((t, index) => {
+                if(t.type === 'income') totalInc += t.amount; else totalExp += t.amount;
+                
+                let originalIndex = transactions.indexOf(t);
+
+                listEl.innerHTML += `
+                    <div class="swipe-wrapper">
+                        <div class="swipe-actions">
+                            <button class="action-btn btn-edit-action" onclick="editTransaction(${originalIndex})" title="Edit">👁️</button>
+                            <button class="action-btn btn-del-action" onclick="promptDelete(${originalIndex})" title="Hapus">🗑️</button>
+                        </div>
+                        <div class="transaction-item" id="trans-item-${originalIndex}" ontouchstart="touchStart(event, ${originalIndex})" ontouchmove="touchMove(event, ${originalIndex})" ontouchend="touchEnd(event, ${originalIndex})" onmousedown="mouseStart(event, ${originalIndex})" onmousemove="mouseMove(event, ${originalIndex})" onmouseup="mouseEnd(event, ${originalIndex})" onmouseleave="mouseEnd(event, ${originalIndex})">
+                            <div class="trans-info"><h4>${t.desc}</h4><p>${t.date} • ${t.cat}</p></div>
+                            <div class="right-info">
+                                <div class="trans-amount" style="color: ${t.type === 'income' ? '#4ade80' : '#f87171'};">${t.type === 'income' ? '+' : '-'} ${formatRupiah(t.amount)}</div>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+
+            document.getElementById('totalIncome').innerText = formatRupiah(totalInc);
+            document.getElementById('totalExpense').innerText = formatRupiah(totalExp);
+            document.getElementById('totalBalance').innerText = formatRupiah(totalInc - totalExp);
+        }
+
+        let startX = 0;
+        let currentX = 0;
+        let isDragging = false;
+        let activeCardIndex = null;
+
+        function touchStart(e, index) {
+            startX = e.touches[0].clientX;
+            isDragging = true;
+            activeCardIndex = index;
+        }
+
+        function touchMove(e, index) {
+            if (!isDragging || activeCardIndex !== index) return;
+            currentX = e.touches[0].clientX;
+            let diff = currentX - startX;
+            let item = document.getElementById(`trans-item-${index}`);
+            if (diff < 0 && diff > -95) {
+                item.style.transform = `translateX(${diff}px)`;
+            }
+        }
+
+        function touchEnd(e, index) {
+            if (!isDragging || activeCardIndex !== index) return;
+            isDragging = false;
+            let item = document.getElementById(`trans-item-${index}`);
+            let diff = currentX - startX;
+            if (diff < -45) {
+                item.style.transform = `translateX(-90px)`;
+            } else {
+                item.style.transform = `translateX(0px)`;
+            }
+        }
+
+        function mouseStart(e, index) {
+            startX = e.clientX;
+            isDragging = true;
+            activeCardIndex = index;
+        }
+
+        function mouseMove(e, index) {
+            if (!isDragging || activeCardIndex !== index) return;
+            currentX = e.clientX;
+            let diff = currentX - startX;
+            let item = document.getElementById(`trans-item-${index}`);
+            if (diff < 0 && diff > -95) {
+                item.style.transform = `translateX(${diff}px)`;
+            }
+        }
+
+        function mouseEnd(e, index) {
+            if (!isDragging || activeCardIndex !== index) return;
+            isDragging = false;
+            let item = document.getElementById(`trans-item-${index}`);
+            let diff = currentX - startX;
+            if (diff < -45) {
+                item.style.transform = `translateX(-90px)`;
+            } else {
+                item.style.transform = `translateX(0px)`;
+            }
+        }
+
+        function renderDebts() {
+            const listEl = document.getElementById('debtList');
+            listEl.innerHTML = '';
+            let tDebt = 0, tRec = 0;
+
+            if(debts.length === 0) {
+                listEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px;">Belum ada catatan utang.</div>`;
+            }
+
+            debts.forEach((d, index) => {
+                if(d.type === 'debt') tDebt += d.amount; else tRec += d.amount;
+                listEl.innerHTML += `
+                    <div class="debt-item">
+                        <div class="debt-info"><h4>${d.name}</h4><p>${d.date} • ${d.type === 'debt' ? 'Utang Saya' : 'Piutang'}</p></div>
+                        <div class="right-info">
+                            <div class="debt-amount" style="color: ${d.type === 'debt' ? '#f87171' : '#4ade80'};">${formatRupiah(d.amount)}</div>
+                            <button class="btn-delete" onclick="deleteDebt(${index})" title="Hapus">✕</button>
+                        </div>
+                    </div>`;
+            });
+
+            document.getElementById('totalDebt').innerText = formatRupiah(tDebt);
+            document.getElementById('totalReceivable').innerText = formatRupiah(tRec);
+        }
+
+        function updateSummary() {
+            let totalInc = transactions.filter(t => t.type === 'income').reduce((a, b) => a + b.amount, 0);
+            let totalExp = transactions.filter(t => t.type === 'expense').reduce((a, b) => a + b.amount, 0);
+            let balance = totalInc - totalExp;
+
+            document.getElementById('summaryText').innerText = transactions.length === 0 ? 
+                "Belum ada data transaksi tercatat." : 
+                `Total pemasukan tercatat ${formatRupiah(totalInc)} berbanding pengeluaran ${formatRupiah(totalExp)}. Sisa saldo bersih saat ini adalah ${formatRupiah(balance)}.`;
+        }
+
+        function renderCharts() {
+            const ctxTrend = document.getElementById('trendChart').getContext('2d');
+            let runningBalance = 0;
+            let chartLabels = [];
+            let chartData = [];
+            let sliceData = [...transactions].reverse();
+
+            if(sliceData.length === 0) {
+                chartLabels = ['Mulai'];
+                chartData = [0];
+            } else {
+                sliceData.forEach((t) => {
+                    if(t.type === 'income') runningBalance += t.amount;
+                    else runningBalance -= t.amount;
+                    chartLabels.push(t.date.split('•')[0].trim());
+                    chartData.push(runningBalance);
+                });
+            }
+
+            if(trendChartObj) { trendChartObj.destroy(); }
+
+            trendChartObj = new Chart(ctxTrend, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: 'Saldo',
+                        data: chartData,
+                        borderColor: '#ff5722',
+                        backgroundColor: 'rgba(255, 87, 34, 0.15)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#9ca3af', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#9ca3af', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+
+            const ctxCategory = document.getElementById('categoryChart').getContext('2d');
+            let expenses = transactions.filter(t => t.type === 'expense');
+            let categoryMap = {};
+
+            expenses.forEach(e => {
+                let key = e.cat || 'Umum';
+                categoryMap[key] = (categoryMap[key] || 0) + e.amount;
+            });
+
+            let catLabels = Object.keys(categoryMap);
+            let catValues = Object.values(categoryMap);
+            let colors = ['#ff5722', '#36a2eb', '#4ade80', '#ffcd56', '#9966ff', '#c9cbcf', '#ff9f40', '#4bc0c0'];
+
+            let legendEl = document.getElementById('categoryLegend');
+            legendEl.innerHTML = '';
+
+            if(catLabels.length === 0) {
+                catLabels = ['Belum ada pengeluaran'];
+                catValues = [1];
+                colors = ['#2d2d35'];
+                legendEl.innerHTML = `<span style="color: var(--text-muted); text-align: center;">Belum ada data pengeluaran kategori.</span>`;
+            } else {
+                catLabels.forEach((lbl, idx) => {
+                    legendEl.innerHTML += `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="display: flex; align-items: center; gap: 6px;">
+                                <span style="width: 10px; height: 10px; background-color: ${colors[idx % colors.length]}; border-radius: 50%;"></span>
+                                ${lbl}
+                            </span>
+                            <span style="font-weight: bold;">${formatRupiah(categoryMap[lbl])}</span>
+                        </div>`;
+                });
+            }
+
+            if(categoryChartObj) { categoryChartObj.destroy(); }
+
+            categoryChartObj = new Chart(ctxCategory, {
+                type: 'doughnut',
+                data: {
+                    labels: catLabels,
+                    datasets: [{
+                        data: catValues,
+                        backgroundColor: colors,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        function openModal(type) { 
+            if(type === 'trans') {
+                document.getElementById('editIndex').value = "-1";
+                document.getElementById('modalTitle').innerText = "Tambah Transaksi";
+                document.getElementById('tDesc').value = "";
+                document.getElementById('tCat').value = "";
+                document.getElementById('tAmount').value = "";
+            }
+            document.getElementById(type === 'trans' ? 'modalTrans' : 'modalDebt').classList.add('active'); 
+        }
+
+        function closeModal(type) { 
+            if(type === 'delete') {
+                document.getElementById('modalDeleteConfirm').classList.remove('active');
+            } else {
+                document.getElementById(type === 'trans' ? 'modalTrans' : 'modalDebt').classList.remove('active'); 
+            }
+        }
+
+        function saveTransaction() {
+            let desc = document.getElementById('tDesc').value;
+            let cat = document.getElementById('tCat').value;
+            let typeSelected = document.getElementById('tType').value;
+            let amount = parseFloat(document.getElementById('tAmount').value);
+            let editIdx = parseInt(document.getElementById('editIndex').value);
+
+            if(!desc || !amount) return alert('Isi keterangan dan nominal!');
+
+            let realType = 'income';
+            if(typeSelected === 'expense' || typeSelected === 'saya_ngutang') {
+                realType = 'expense';
+            } else {
+                realType = 'income';
+            }
+
+            let finalDesc = desc;
+            if(typeSelected === 'orang_ngutang' && !desc.toLowerCase().includes('orang ngutang')) {
+                finalDesc = 'Orang Ngutang: ' + desc;
+            } else if(typeSelected === 'saya_ngutang' && !desc.toLowerCase().includes('saya ngutang')) {
+                finalDesc = 'Saya Ngutang: ' + desc;
+            }
+
+            let now = new Date();
+            let dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+            let timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            let fullDateTime = `${dateStr} • ${timeStr}`;
+
+            if(editIdx >= 0) {
+                transactions[editIdx] = { desc: finalDesc, cat: cat || 'Umum', type: realType, amount, date: transactions[editIdx].date };
+            } else {
+                transactions.unshift({ desc: finalDesc, cat: cat || 'Umum', type: realType, amount, date: fullDateTime });
+            }
+
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+            closeModal('trans');
+            renderTransactions();
+        }
+
+        function editTransaction(index) {
+            let t = transactions[index];
+            document.getElementById('editIndex').value = index;
+            document.getElementById('modalTitle').innerText = "Edit Transaksi";
+            document.getElementById('tDesc').value = t.desc;
+            document.getElementById('tCat').value = t.cat;
+            document.getElementById('tAmount').value = t.amount;
+            document.getElementById('tType').value = t.type;
+            document.getElementById('modalTrans').classList.add('active');
+        }
+
+        function promptDelete(index) {
+            document.getElementById('deleteIndex').value = index;
+            document.getElementById('modalDeleteConfirm').classList.add('active');
+        }
+
+        function confirmDelete() {
+            let index = parseInt(document.getElementById('deleteIndex').value);
+            if(index >= 0) {
+                transactions.splice(index, 1);
+                localStorage.setItem('transactions', JSON.stringify(transactions));
+                renderTransactions();
+            }
+            closeModal('delete');
+        }
+
+        function saveDebt() {
+            let nameInput = document.getElementById('dName').value;
+            let type = document.getElementById('dType').value;
+            let amount = parseFloat(document.getElementById('dAmount').value);
+            if(!nameInput || !amount) return alert('Isi nama dan nominal!');
+
+            let now = new Date();
+            let dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+            let timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            let fullDateTime = `${dateStr} • ${timeStr}`;
+
+            debts.unshift({ name: nameInput, type, amount, date: fullDateTime });
+            localStorage.setItem('debts', JSON.stringify(debts));
+            closeModal('debt');
+            renderDebts();
+            document.getElementById('dName').value = ''; document.getElementById('dAmount').value = '';
+        }
+
+        function deleteDebt(index) {
+            if(confirm('Hapus catatan utang ini?')) {
+                debts.splice(index, 1);
+                localStorage.setItem('debts', JSON.stringify(debts));
+                renderDebts();
+            }
+        }
+
+        renderTransactions();
+        renderDebts();
+    </script>
+</body>
+</html>
